@@ -1,0 +1,442 @@
+
+
+What are Go modules and how do I use them?
+15 Aug 2018
+
+Paul Jolly
+modelogiq
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+* Today we will
+
+- Look at why we need package management in Go
+- Introduce Go modules
+- Work through a number of examples
+- See how you can get started using modules
+- Contribute back to the Go project in the process
+
+* Why do we need package management in Go?
+
+* t0: we start to write program P
+
+.image images/t0.png
+
+* t1: we add a dependency on D
+
+.image images/t1.png
+
+: Downloads and installs current latest version of D; 1.0
+
+* t2: we add a dependency on C
+
+.image images/t2.png
+
+: Some time later we add a dependency on C; latest version is 1.8
+: C requires D 1.4, but go get spots we already have package D
+: C is broken, and in this case P is broken
+: D is too old
+
+* t3: we update C (and its dependencies)
+
+.image images/t3.png
+
+: go get -u updates C and its dependencies
+: unfortunately author of D just released 1.6
+: Turns out D also breaks C... and by extension P
+: Now D is too new
+: So sometimes go get fails because it leaves us in a situation where D is too old, sometimes too new
+: What we need is the ability to build P with exactly the version that the author of C used
+: But go get has not awareness of package versions at all
+
+* History
+
+- Various tools/approaches to help specify version requirements
+- GOPATH, goven, godeps, godep, gopkg.in, glide, gb, govendor, vendor dir, dep
+- All approaches vary somewhat
+- Cannot create other version-aware tools
+
+* Introducing Go modules
+
+* Go 1.11 introduces Go modules
+
+- A module is a collection of related Go packages
+- Modules are the unit of source code interchange and versioning
+- The go command has direct support for working with modules
+- Modules replace the old GOPATH-based approach to specifying which source files are used in a given build
+
+    go help modules
+
+* The principles of versioning in Go
+
+*Compatibility*
+
+Import compatibility rule - if and old package and a new package have the same import path, the new package must be backwards-compatible with the old package
+
+*Repeatability*
+
+The result of a build of a given version of a package should not change over time
+
+*Cooperation*
+
+We must all work together to maintain the Go package ecosystem. Tools cannot work around a lack of cooperation.
+
+* Semantic Import Versioning
+
+.image images/semver.png 400 _
+
+.caption See https://semver.org/ and https://research.swtch.com/vgo-import
+
+* Worked Example 1: creating a module
+
+* Example 1: creating a module
+
+    $ mkdir /tmp/hello
+    $ cd /tmp/hello
+    $ go mod init github.com/myitcv/hello
+    go: creating new go.mod: module github.com/myitcv/hello
+    $ ls
+    go.mod
+    $ cat go.mod
+    module github.com/myitcv/hello
+    
+
+* Example 1: adding a dependency
+
+    $ cat hello.go
+    package main
+    
+    import (
+    	"fmt"
+    	"rsc.io/quote"
+    )
+    
+    func main() {
+    	fmt.Println(quote.Hello())
+    }
+    $ go build
+    go: finding rsc.io/quote v1.5.2
+    go: downloading rsc.io/quote v1.5.2
+    go: finding rsc.io/sampler v1.3.0
+    go: finding golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c
+    go: downloading rsc.io/sampler v1.3.0
+    go: downloading golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c
+    $ ./hello
+    Hello, world.
+    
+
+* Example 1: examine dependencies
+
+    $ cat go.mod
+    module github.com/myitcv/hello
+    
+    require rsc.io/quote v1.5.2
+    $ go list -m all
+    github.com/myitcv/hello
+    golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c
+    rsc.io/quote v1.5.2
+    rsc.io/sampler v1.3.0
+    
+
+: The go.mod file lists a minimal set of requirements, omitting those implied by the ones already listed
+: Even if rsc.io/quote v1.5.3 or v1.6.0 is released tomorrow, builds in this directory will keep using v1.5.2 until an explicit upgrade (see below).
+
+* Example 1: rebuild
+
+    $ go build
+    $ ./hello
+    Hello, world.
+    $ LANG=fr ./hello
+    Bonjour le monde.
+    
+
+: why our simple “hello world” program uses golang.org/x/text. It turns out that rsc.io/quote depends on rsc.io/sampler, which in turn uses golang.org/x/text for language matching
+
+* Example 1: upgrading modules
+
+    $ go list -m -u all
+    go: finding rsc.io/sampler v1.99.99
+    go: finding golang.org/x/text v0.3.0
+    github.com/myitcv/hello
+    golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c [v0.3.0]
+    rsc.io/quote v1.5.2
+    rsc.io/sampler v1.3.0 [v1.99.99]
+    $ go get -u golang.org/x/text
+    go: downloading golang.org/x/text v0.3.0
+    $ cat go.mod
+    module github.com/myitcv/hello
+    
+    require (
+    	golang.org/x/text v0.3.0 // indirect
+    	rsc.io/quote v1.5.2
+    )
+    $ go list -m all
+    github.com/myitcv/hello
+    golang.org/x/text v0.3.0
+    rsc.io/quote v1.5.2
+    rsc.io/sampler v1.3.0
+    
+
+* Example 1: testing
+
+    $ go test -short all
+    ?   	github.com/myitcv/hello	[no test files]
+    ok  	fmt	0.120s
+    ok  	rsc.io/quote	0.011s
+    ok  	errors	0.017s
+    ok  	io	0.031s
+    ok  	math	0.018s
+    ok  	os	1.208s
+    ok  	reflect	0.402s
+    ok  	strconv	0.657s
+    ...
+    
+
+* Example 1: module packages
+
+    $ go test rsc.io/quote/...
+    ok  	rsc.io/quote	0.003s
+    --- FAIL: Test (0.00s)
+        buggy_test.go:10: buggy!
+    FAIL
+    FAIL	rsc.io/quote/buggy	0.001s
+    
+
+* Example 1: upgrade all modules
+
+    $ go get -u
+    go: downloading rsc.io/sampler v1.99.99
+    $ cat go.mod
+    module github.com/myitcv/hello
+    
+    require (
+    	golang.org/x/text v0.3.0 // indirect
+    	rsc.io/quote v1.5.2
+    	rsc.io/sampler v1.99.99 // indirect
+    )
+    
+
+* Example 1: retest
+
+    $ go test -short all
+    ?   	github.com/myitcv/hello	[no test files]
+    ok  	fmt	(cached)
+    --- FAIL: TestHello (0.00s)
+        quote_test.go:19: Hello() = "99 bottles of beer on the wall, 99 bottles of beer, ...", want "Hello, world."
+    FAIL
+    FAIL	rsc.io/quote	0.015s
+    ok  	errors	(cached)
+    ok  	io	(cached)
+    ok  	math	(cached)
+    ...
+    
+
+* Example 1: check behaviour
+
+    $ go build
+    $ ./hello
+    99 bottles of beer on the wall, 99 bottles of beer, ...
+    
+
+* Example 1: downgrading
+
+    $ go list -m -versions rsc.io/sampler
+    rsc.io/sampler v1.0.0 v1.2.0 v1.2.1 v1.3.0 v1.3.1 v1.99.99
+    $ go get rsc.io/sampler@v1.3.1
+    go: finding rsc.io/sampler v1.3.1
+    go: downloading rsc.io/sampler v1.3.1
+    $ go list -m all
+    github.com/myitcv/hello
+    golang.org/x/text v0.3.0
+    rsc.io/quote v1.5.2
+    rsc.io/sampler v1.3.1
+    $ cat go.mod
+    module github.com/myitcv/hello
+    
+    require (
+    	golang.org/x/text v0.3.0 // indirect
+    	rsc.io/quote v1.5.2
+    	rsc.io/sampler v1.3.1 // indirect
+    )
+    
+
+* Example 1: retest post downgrade
+
+    $ go test -short all
+    ?   	github.com/myitcv/hello	[no test files]
+    ok  	fmt	(cached)
+    ok  	rsc.io/quote	0.014s
+    ok  	errors	(cached)
+    ok  	io	(cached)
+    ok  	math	(cached)
+    ok  	os	0.716s
+    ok  	reflect	(cached)
+    ok  	strconv	(cached)
+    ...
+    
+
+* Example 1: fork quote
+
+    $ git clone https://github.com/rsc/quote /tmp/quote
+    Cloning into '/tmp/quote'...
+    $ cd /tmp/quote
+    $ quoteVer=$(cd /tmp/hello && go list -m -f "{{.Version}}" rsc.io/quote)
+    $ echo $quoteVer
+    v1.5.2
+    $ git checkout -b quote_fix $quoteVer
+    Switched to a new branch 'quote_fix'
+    
+
+Edit `quote.go`.
+
+* Example 1: use local changes
+
+    $ cd /tmp/hello
+    $ go mod edit -replace 'rsc.io/quote=../quote'
+    $ go list -m all
+    github.com/myitcv/hello
+    golang.org/x/text v0.3.0
+    rsc.io/quote v1.5.2 => ../quote
+    rsc.io/sampler v1.3.1
+    $ go build
+    $ ./hello
+    I can eat glass and it doesn't hurt me.
+    
+
+* Example 1: push our local changes to remote fork
+
+    $ cd /tmp/quote
+    $ git remote add myitcv https://github.com/myitcv/london-gophers-quote-fork
+    $ git commit -a -m 'my fork'
+    [quote_fix 66b4fab] my fork
+     1 file changed, 1 insertion(+), 1 deletion(-)
+    $ git push myitcv
+    To https://github.com/myitcv/london-gophers-quote-fork
+     * [new branch]      quote_fix -> quote_fix
+    $ git tag v0.0.0-myfork
+    $ git push myitcv v0.0.0-myfork
+    To https://github.com/myitcv/london-gophers-quote-fork
+     * [new tag]         v0.0.0-myfork -> v0.0.0-myfork
+    
+
+* Example 1: use remote version
+
+    $ cd /tmp/hello
+    $ go mod edit -replace 'rsc.io/quote=github.com/myitcv/london-gophers-quote-fork@v0.0.0-myfork'
+    $ go list -m all
+    go: finding github.com/myitcv/london-gophers-quote-fork v0.0.0-myfork
+    github.com/myitcv/hello
+    golang.org/x/text v0.3.0
+    rsc.io/quote v1.5.2 => github.com/myitcv/london-gophers-quote-fork v0.0.0-myfork
+    rsc.io/sampler v1.3.1
+    $ go build
+    go: downloading github.com/myitcv/london-gophers-quote-fork v0.0.0-myfork
+    $ LANG=fr ./hello
+    Je peux manger du verre, ça ne me fait pas mal.
+    
+
+* Worked Example 2: converting an existing project
+
+* Example 2: converting an existing project
+
+    $ git clone https://github.com/juju/juju
+    Cloning into 'juju'...
+    $ cd juju
+    $ go mod init
+    go: creating new go.mod: module github.com/juju/juju
+    go: copying requirements from Gopkg.lock
+    $ go mod tidy
+    go: finding github.com/coreos/go-systemd v0.0.0-20160202211425-7b2428fec400
+    go: finding github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+    go: finding github.com/juju/gojsonschema v0.0.0-20150312170016-e1ad140384f2
+    go: finding github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
+    go: finding github.com/juju/description v0.0.0-20180530031750-25349c35a6b1
+    go: finding github.com/juju/packaging v0.0.0-20180516203043-ba21344fff20
+    go: finding github.com/gosuri/uitable v0.0.0-20160404203958-36ee7e946282
+    go: finding github.com/hashicorp/raft v0.0.0-20180117202925-077966dbc90f
+    ...
+    
+
+* Much more
+
+- Publishing modules
+- Proxy support for published modules ([[https://github.com/gomods/athens]])
+- Tooling built atop go modules ([[https://github.com/rogpeppe/gohack]])
+- Full support for custom import paths
+- Go submodules natively supported (mono repos)
+
+* More subcommands
+
+  Usage:
+
+        go mod <command> [arguments]
+
+  The commands are:
+
+        download    download modules to local cache
+        edit        edit go.mod from tools or scripts
+        fix         make go.mod semantically consistent
+        graph       print module requirement graph
+        init        initialize new module in current directory
+        tidy        add missing and remove unused modules
+        vendor      make vendored copy of dependencies
+        verify      verify dependencies have expected content
+        why         explain why packages or modules are needed
+
+
+* Great: how/where do I get started?
+
+* Use Go 1.11rc1
+
+- Two days ago Go 1.11rc1 was released
+- Download or install
+- Has module support
+- Work outside GOPATH or set GO111MODULE=on inside GOPATH
+
+    go get http://golang.org/dl/go1.11rc1
+    go1.11rc1 download
+    go1.11rc1 help modules
+
+* Try out modules
+
+- Start new projects using Go modules
+- Convert existing projects
+- Ask questions: golang-nuts, Gophers Slack, Stack Overflow... ([[https://github.com/golang/go/wiki/Questions]])
+- Report Github issues for bugs or (a lack of) docuemtation ([[https://github.com/golang/go/issues/new]])
+- Create experience reports ([[https://github.com/golang/go/wiki/ExperienceReports]])
+
+: Check existing issues; look at existing issues for best practice
+
+* Success stories
+
+.image images/roger.png 200 _
+.image images/filippo.png 300 _
+
+* FAQ
+
+- should we replace `dep` with modules?
+- should we wait to start using modules?
+- should we still be vendoring dependencies?
+- how can we convert a `v>=2` project to a Go module without breaking import paths?
+
+: stability and support for older Go releases, vs not needing to use a third party tool and being able to drop GOPATH and vendor, etc
+: unless people want to run rc1 in CI/CD, I presume most will want to wait for the final release
+: can be good to support older versions of Go, and as a temporary solution to the lack of a module proxy community
+: the good old question; perhaps not as popular as the others, though
+
+* Credits
+
+- Russ Cox and Bryan Mills for their work in making Go modules happen
+- Numerous people in the Go community, both inside and out of Google, who have helped to get modules to where they are today
+- Daniel Martí, Roger Peppe and Axel Wagner for sharing thoughts/giving feedback on these slides and Go modules topics more broadly
+
+* Links
+
+- `cmd/go` documentation ([[https://tip.golang.org/cmd/go]])
+- Modules wiki ([[https://github.com/golang/go/wiki/Modules]])
+- Russ Cox's GopherCon Singapore Keynote ([[https://www.youtube.com/watch?v=F8nrpe0XWRg]])
+- Russ Cox's original `vgo` series ([[https://research.swtch.com/vgo]])
+
+
+
