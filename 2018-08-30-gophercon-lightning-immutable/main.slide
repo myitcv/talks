@@ -1,0 +1,164 @@
+
+
+Immutable/persistent data structures in Go
+30 Aug 2018
+
+Paul Jolly
+modelogiq
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+* Why are immutable/persistent data structures useful?
+
+* A good printer
+
+    
+    func PrintMap(m map[string]int) {
+    	for k, v := range m {
+    		fmt.Printf("k = %v; v = %v\n", k, v)
+    	}
+    }
+    
+    func main() {
+    	m := map[string]int{"hello": 5, "world": 10}
+    	fmt.Printf("map has len %v\n", len(m))
+    	PrintMap(m)
+    	fmt.Printf("map has len %v\n", len(m))
+    }
+    
+
+gives
+
+    map has len 2
+    k = hello; v = 5
+    k = world; v = 10
+    map has len 2
+    
+
+* A bad printer
+
+    
+    func PrintMap(m map[string]int) {
+    	for k, v := range m {
+    		fmt.Printf("k = %v; v = %v\n", k, v)
+    	}
+    	m["bad"] = 42
+    }
+    
+    func main() {
+    	m := map[string]int{"hello": 5, "world": 10}
+    	fmt.Printf("map has len %v\n", len(m))
+    	PrintMap(m)
+    	fmt.Printf("map has len %v\n", len(m))
+    }
+    
+
+gives
+
+    map has len 2
+    k = hello; v = 5
+    k = world; v = 10
+    map has len 3
+    
+
+: Docs can help
+: But things get complicated if you're calling deep into other code...
+: Make assurances about
+
+* Creating immutable/persistent data structures
+
+Let's create an immutable/persistent equivalent:
+
+    //go:generate immutableGen
+    
+    type _Imm_myMap map[string]int
+    
+    
+
+* Running gogenerate
+
+    $ go generate
+    $ ls
+    gen_main_immutableGen.go
+    main.go
+    
+
+* An "imm" printer
+
+    func PrintMap(m *myMap) {
+    	for k, v := range m.Range() {
+    		fmt.Printf("k = %v; v = %v\n", k, v)
+    	}
+    	m.Set("bad", 42)
+    }
+    
+    
+
+* Did it work?
+
+    func main() {
+    	m := newMyMap(func(m *myMap) {
+    		m.Set("hello", 5)
+    		m.Set("world", 10)
+    	})
+    	fmt.Printf("map has len %v\n", m.Len())
+    	PrintMap(m)
+    	fmt.Printf("map has len %v\n", m.Len())
+    }
+    
+    
+
+gives:
+
+    map has len 2
+    k = hello; v = 5
+    k = world; v = 10
+    map has len 2
+    
+
+* Why did it work?
+
+  type ImmutableMap(type K, V) interface {
+
+     Len() int
+
+     Get(k K) (V, bool)
+
+     Set(k K, v V) ImmutableMap(K, V)
+
+     Del(k K) ImmutableMap(K, V)
+
+     Range() map[K]V
+  }
+
+Immutable structs and slices also have their own interface.
+
+* Common immutable interface
+
+  type Immutable(type T) interface {
+
+     Mutable() bool
+
+     AsMutable() Immutable(T)
+
+     AsImmutable(prev Immutable(T)) Immutable(T)
+
+     WithMutable(f func(t Immutable(T))) Immutable(T)
+
+     WithImmutable(f func(t Immutable(T))) Immutable(T)
+  }
+
+
+* Recap
+
+- Write immutable template types as regular go types (structs, maps and slices)
+- Use `go`generate` (`immutableGen`) to explode templates
+- Write your code in terms of the generated types
+- Run `immutableVet` to ensure your code is safe
+
+* Further reading
+
+- [[https://github.com/myitcv/x/blob/master/immutable/_doc/README.md]["Docs"]]
+
+
