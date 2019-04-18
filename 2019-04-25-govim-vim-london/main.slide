@@ -1,0 +1,188 @@
+gopls + vim = govim
+Go development plugin for Vim8
+25 Apr 2019
+
+Paul Jolly
+modelogiq
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+: I am Paul
+: Co-organiser of London Gophers
+: Enjoy building tools in Go
+
+* Today we will
+
+- cover a bit of "history" regarding Vim's relationship with Go
+- introduce `gopls`, Go's new language server
+- introduce `govim`, a new Go development plugin for Vim8 backed by `gopls`
+- see some demos
+
+* Go 2018 User Survey - preferred editor
+
+.image images/survey_results.png 600 _
+
+* In the beginning there were editors...
+
+.image ../2019-04-17-govim/images/editors.png 500 _
+
+* Then some tools came along...
+
+.image ../2019-04-17-govim/images/tools.png 500 _
+
+* Things started to get a bit messy....
+
+.image ../2019-04-17-govim/images/chaos.jpg 500 _
+
+* Problems with this approach
+
+- Large development effort for editor plugin developers
+- Inconsistent approach/API between tools
+- No consistent user experience between editors
+- Problems of editor plugin and tool continuity
+- Slow and inefficient: each tool parses/type checks/builds SSA, generally no caching
+
+* Enter gopls
+
+`gopls` is an LSP (Language Server Protocol) server for Go, largely written by Rebecca Stambler, Ian Cottrell, and the Go Tools Team in New York.
+
+_The_Language_Server_Protocol_(LSP)_defines_the_protocol_used_between_an_editor_or_IDE_and_a_language_server_that_provides_language_features_like_auto_complete,_go_to_definition,_find_all_references_etc._
+
+.link https://microsoft.github.io/language-server-protocol/
+
+* gopls and editors
+
+.image ../2019-04-17-govim/images/gopls.png 550 _
+
+* Benefits of this approach
+
+- Better coordination of development effort
+- Consistent approach to new features in `gopls`
+- Consistent user experience between editors
+- Fast and efficient: shared AST/type checking results/SSA form, fully cached
+
+* Enter govim
+
+`govim` is a Go development plugin for Vim8, backed by `gopls`. But unlike `vim-go` it's written in Go, not VimScript
+
+Features:
+
+- hover information
+- format-on-save
+- code completion
+- go-to definition
+- quickfix diagnostics
+- ...
+
+Status: alpha
+
+.link https://github.com/myitcv/govim
+
+* But what is/was wrong with vim-go?
+
+Nothing!
+
+[[https://twitter.com/fatih][Fatih Arslan]], [[https://twitter.com/bhcleek][Billie Cleek]] et al have done a _fantastic_ job with `vim-go`. Indeed `vim-go` is also using `gopls` for some commands.
+
+`govim` is an _experiment_ testing the hypothesis that writing Vim8 plugins in Go:
+
+- will make for more readable/maintainable code
+- will enable more people to contribute
+- ...
+
+.link https://github.com/myitcv/govim/wiki/FAQ#why-have-you-created-govim-what-iswas-wrong-with-vim-go
+
+* Upcoming govim features
+
+- full `gopls` support (by extension, contribute to `gopls`)
+- _anything_you_would_like_to_see?_
+- ...
+
+.link https://github.com/myitcv/govim/issues
+
+* Contributing
+
+Contributions are very much welcome in the form of:
+
+- feedback
+- issues
+- PRs
+
+* 
+
+.image ../2019-04-17-govim/images/demo.png 280 _
+.caption [[https://github.com/myitcv/govim]]
+
+* Recap on Vim8 channels
+
+- Vim uses channels to communicate with other processes
+- A channel uses a socket or pipes
+- Jobs can be used to start processes and communicate with them
+- RAW, NL, JSON and JS protocols are available for both sockets and pipes
+
+.link https://vimhelp.org/channel.txt.html
+
+* govim "architecture"
+
+.image ../2019-04-17-govim/images/architecture.png _ 900
+
+* govim automated testing
+
+.image ../2019-04-17-govim/images/testing.png _ 900
+
+* govim automated testing (continued)
+
+- Each test is a `testscript` script
+- Each test runs its own isolated instance of Vim/Gvim + `govim` (+ `gopls`)
+- Within each script, the `vim` "command" can be used to drive Vim/Gvim
+- Assertions based on Vim/Gvim state, files on disk etc
+
+* Example govim test
+
+  # Ensure the default is goimports
+  vim expr 'g:govim_format_on_save'
+  stdout '^"goimports"$'
+
+  # goimports
+  cp file.go.orig file.go
+  vim ex 'e! file.go'
+  vim ex 'w'
+  cmp file.go file.go.goimports
+
+.link https://godoc.org/github.com/rogpeppe/go-internal/testscript
+
+* Example govim test (continued)
+
+  -- go.mod --
+  module mod.com
+
+  -- file.go.orig --
+  package blah
+
+  const ( x = 5
+  y = os.PathSeparator
+   )
+  -- file.go.goimports --
+  package blah
+
+  import "os"
+
+  const (
+          x = 5
+          y = os.PathSeparator
+  )
+
+
+* Thanks
+
+- [[https://www.moolenaar.net][Bram Moolenaar]] for Vim
+- [[https://twitter.com/fatih][Fatih Arslan]], [[https://twitter.com/bhcleek][Billie Cleek]] et al for `vim-go`
+- Rebecca Stambler, Ian Cottrell, and the entire Go Tools Team for `gopls` amongst many other things
+- The [[https://github.com/golang/go/wiki/golang-tools][golang-tools]] community for being so awesome
+
+* 
+
+.image ../2019-04-17-govim/images/demo.png 280 _
+.caption [[https://github.com/myitcv/govim]]
+
