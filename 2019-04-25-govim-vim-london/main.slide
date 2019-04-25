@@ -173,6 +173,37 @@ Contributions are very much welcome in the form of:
           y = os.PathSeparator
   )
 
+* Running the test
+
+  $ go test -v -run='TestScripts/scripts/^format_on_save_simple$'
+
+  ...
+
+    # Ensure the default is goimports (0.003s)
+    > vim expr 'g:govim_format_on_save'
+    [stdout]
+    "goimports"
+    > stdout '^"goimports"$'
+    # goimports (0.056s)
+    > cp file.go.orig file.go
+    > vim ex 'e! file.go'
+    > vim ex 'w'
+    > cmp file.go file.go.goimports
+    PASS
+
+  PASS
+  ok      github.com/myitcv/govim/cmd/govim       1.001s
+
+* What is govim's test coverage like?
+
+Best summarised as "a good start":
+
+- All installation options (Vim8 packages, pathogen, vim-plug, vundle)
+- Completion, format-on-save, hover (partially), go-to-def, commands, functions...
+- These build atop the tests for `github.com/myitcv/govim`, the plugin API package
+
+All run within a continuous integration matrix that covers multiple Vim and Go
+versions. Tests run for both Vim and Gvim
 
 * Thanks
 
