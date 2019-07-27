@@ -1,0 +1,53 @@
+gopls + vim = govim
+Go development plugin for Vim8
+27 Jul 2019
+
+Paul Jolly
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+* In the beginning there were editors...
+
+.image ../2019-04-17-govim/images/editors.png 500 _
+
+* Then some tools came along...
+
+.image ../2019-04-17-govim/images/tools.png 500 _
+
+* Things started to get a bit messy....
+
+.image ../2019-04-17-govim/images/chaos.jpg 500 _
+
+* gopls and editors
+
+.image ../2019-04-17-govim/images/gopls.png 550 _
+
+* 
+
+.image ../2019-04-17-govim/images/demo.png 280 _
+.caption [[https://github.com/myitcv/govim]]
+
+* govim
+
+`govim` is a Go development plugin for Vim8, backed by `gopls`. But unlike `vim-go` it's written in Go, not VimScript
+
+Features:
+
+- hover information
+- format-on-save
+- code completion
+- go-to definition
+- quickfix diagnostics
+- ...
+
+.link https://github.com/myitcv/govim
+
+* Contributing
+
+Contributions are very much welcome in the form of:
+
+- feedback
+- issues
+- PRs
+- ...
