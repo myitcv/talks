@@ -1,0 +1,498 @@
+Write less (code), generate more
+Exploring code generation in Go
+23 Aug 2019
+
+Paul Jolly
+modelogiq.com
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+: I am Paul
+: Co-organiser of London Gophers
+: Enjoy building tools in Go, including code generators
+
+* Today we will
+
+- examine the principles of code generation
+- discover the main parts of a code generator
+- look at some popular code generators
+- see how code generation fits into developer workflow
+- write a simple code generator
+- inspire everyone to join the golang-tools community of tool builders!
+
+.image images/tool_gopher.png 200 _
+.caption Gopherize.me artwork courtesy of Ashley McNamara
+
+: Goal of this talk is to equip and inspire people to experiment with code generation in their development workflow
+: Therefore become more efficient/effective at writing software/software engineering in the process
+: So let's start by looking at what we mean by code generation
+
+* What do we mean by code generation?
+
+Code generation is the process of generating code.
+
+Code generators are the things that generate code.
+
+.image images/code_gen_output.png _ 900
+
+: Quick show of hands: who here has written some (Go) code?
+
+* Who/What is a code generator?
+
+Humans are code generators:
+
+- very creative
+- good at problem solving
+- not good at repetitive, robotic tasks
+
+.image images/homer.png 300 _
+.caption ©2006 Twentieth Century Fox Film Corporation
+
+: But everyone here knows what is good at such tasks
+
+* Who/What is a code generator?
+
+Programs can be code generators:
+
+- a computer program can write a computer program
+- (currently) no creative or problem solving abilities
+- good at repetitive, robotic tasks
+
+.image images/gopher.png 300 _
+.caption _Gopher_ by [[http://www.reneefrench.com][Renée French]]
+
+: So what can code generators generate?
+
+* What code can be generated?
+
+.image images/languages.jpg 500 _
+.caption Image taken from codeinstitute.net
+
+: #allthethings; anything that can be stored/processed by a computer
+: Completing the flow diagram, what about the inputs?
+
+* But what about the input(s)?
+
+.image images/code_gen_output.png _ 900
+
+- Flags/arguments
+- Code
+- Configuration
+- Metadata
+- Environment
+- No input
+- ...
+
+: All manner of options here
+: Consider tools like Hugo that generate templates as code generators
+: But for today...
+
+* Today: we will focus on Go-based code generation
+
+.image images/go_code_gen.png _ 800
+
+: ...with flags/arguments
+: Quick bit of audience participation: shout of the names of some code generators
+
+* Examples of code generators
+
+- [[https://golang.org/cmd/go/#hdr-Test_packages][go test]]
+  Input:  *_test.go Go source files
+  Output: package main test program source file
+
+- [[https://github.com/gopherjs/gopherjs][github.com/gopherjs/gopherjs]]
+  Input:  Go source code
+  Output: JavaScript source code
+
+- [[https://developers.google.com/protocol-buffers/][Protocol Buffers compiler]]
+  Input:  .proto declarations
+  Output: Go source code, Java source code...
+
+- [[https://godoc.org/golang.org/x/tools/cmd/stringer][golang.org/x/tools/cmd/stringer]]
+  Input:  type declarations in Go code
+  Output: String() method for those types
+
+: go test might be one that surprises many
+: Let's focus on stringer as our example
+
+* Motivating example: stringer
+
+`stringer` automates the creation of methods that satisfy the fmt.Stringer interface
+
+    type Stringer interface {
+        String() string
+    }
+
+- takes name of an integer type T that has constants defined
+- creates a new Go source file implementing:
+
+  func (t T) String() string
+
+: Let's make this more concrete
+
+* stringer: the problem
+
+.code stringerproblem/main.go
+
+Output:
+
+<!-- __TEMPLATE: go run stringerproblem/main.go
+{{indent .Out -}}
+-->
+<!-- END -->
+
+: Clearly not ideal because we gave this constant a name!
+: Add a String() method
+
+* stringer: (naively) doing things by hand
+
+.code stringernaive/main.go /stringfn/,/stringfnend/
+
+Output:
+
+<!-- __TEMPLATE: go run stringernaive/main.go
+{{indent .Out -}}
+-->
+<!-- END -->
+
+Error prone, easily gets out of date, boring!
+
+: Enter code generation
+
+* stringer: code generator
+
+.image images/stringer_docs.png _ 900
+
+: As with many useful Go tools, it lives in x/tools
+: How do we use it?
+
+* stringer: running the tool
+
+<!-- __TEMPLATE: go run golang.org/x/tools/cmd/stringer -help # NEGATE
+{{indent (lineEllipsis 5 .Out) -}}
+-->
+<!-- END -->
+
+Run `stringer` on our type `Pill`:
+
+    $ stringer -type=Pill
+
+: So, what does the output look like?
+
+* stringer: code generator output
+
+<!-- __TEMPLATE: bash -c "cd stringercodegen; go run golang.org/x/tools/cmd/stringer -type=Pill"
+-->
+<!-- END -->
+<!-- __TEMPLATE: sed -e /\/\//d stringercodegen/pill_string.go
+{{indent .Out -}}
+-->
+<!-- END -->
+
+: Rather involved... but that doesn't really matter as long as it works!
+: Hidden the complexity in the code generator
+: Look at workflow in more detail
+
+* stringer: workflow
+
+We can run stringer by hand for one package
+
+But for multiple code generators across multiple packages?
+
+- Which code generators to run where?
+- What flags do each require?
+- Is the sequence significant?
+- ...
+
+Error prone.
+
+: Clearly doing things by hand doesn't scale
+: Could use a Makefile but we're not in the 90's any more
+
+* stringer: meet go generate
+
+go generate automates running code generators
+
+Scans for special comments in Go source code
+
+The special comments are called directives:
+
+    //go:generate stringer -type=Pill
+
+We then run go generate with a list of packages:
+
+    go generate ./...
+
+: Key here is that the directives live alongside the source
+: For more details...
+
+* Go tool refresher
+
+  $ go help
+  ...
+        build       compile packages and dependencies
+        doc         show documentation for package or symbol
+        get         download and install packages and dependencies
+        install     compile and install packages and dependencies
+        list        list packages or modules
+        test        test packages
+        ...         ...
+        generate    generate Go files by processing source
+
+- go generate is not part of go build
+- no dependency analysis; must be run explicitly
+
+: So where are we?
+
+* Recap
+
+- we understand what code generation is
+- we have seen one example of where and why it is useful
+- we have seen how `go`generate` can help manage workflow
+
+: What next?
+
+* Writing our own simple code generator: simplestringer
+
+* simplestringer: what it will do
+
+`simplestringer` will:
+
+- take name of an integer type `T` as the only argument
+- find all constants of type `T` in the source package
+- define a `String()` method on `T` in a new Go file, much like `stringer`
+
+: Exactly the same inputs as before
+: Output should behave in the same way
+: But we're going to cut some corners
+
+* simplestringer: what it won't do
+
+`simplestringer` will not:
+
+- handle errors (gracefully)
+- be very pretty
+- cover all edge cases
+- result in perfect code
+
+: Don't judge me
+: Let's quickly review what I'm going to refer to as "layers of abstraction" in code generation
+
+* simplestringer: figurative review of layers of abstraction
+
+.image images/levels_of_detail.png 500 _
+
+: Higher abstractions are at the top
+: Gain more information as we move towards the top
+: Use that information in our code generation
+: But what, for example, does the AST look like?
+
+* simplestringer: understanding the structure of the Go AST
+
+.image images/syntax_viewer.png 450 _
+
+.caption [[https://blog.myitcv.io/gopherjs_examples_sites/syntaxviewer]]
+
+: Look at a printed representation of the AST for a given piece of Go source
+: So let's move on to looking at the implementation; the use of the AST and types will become clear
+
+* simplestringer: implementation
+
+.code simplestringer/main.go /1 OMIT/,/2 OMIT/
+
+- handle the type name argument we are passed
+- declare a variable to gather the names of constant values
+
+: So we clearly need to define a main function
+
+* simplestringer: implementation (continued
+
+.code simplestringer/main.go /2 OMIT/,/3 OMIT/
+
+- load the type and syntax information for the current directory (package)
+- assert that we have a single package result
+
+: Simplifying assumption
+
+* simplestringer: what is go/packages loading?
+
+.image images/levels_of_detail_with_go_packages.png 500 _
+
+* simplestringer: implementation (continued)
+
+.code simplestringer/main.go /3 OMIT/,/4 OMIT/
+
+- look up the type declaration in the package scope
+
+* simplestringer: implementation (continued)
+
+.code simplestringer/main.go /4 OMIT/,/5 OMIT/
+
+- gather names of constant values
+
+* simplestringer: implementation (continued)
+
+.code simplestringer/main.go /5 OMIT/,/6 OMIT/
+
+- define a template for our output
+
+* simplestringer: implementation (continued)
+
+.code simplestringer/main.go /6 OMIT/,/7 OMIT/
+
+- prepare the value to be passed to the template
+
+* simplestringer: implementation (continued)
+
+.code simplestringer/main.go /7 OMIT/,/8 OMIT/
+
+- create output file, execute template, format result
+
+: Done! Now let's try this out
+
+* simplestringer: in action
+
+<!-- __TEMPLATE: bash -c "set -e; cd usesimplestringer; export GOBIN=$PWD/.gobin; export PATH=$PWD/.gobin:$PATH; go install github.com/myitcv/talks/2019-08-23-gophercon-uk-code-generation/simplestringer; go generate"
+-->
+<!-- END -->
+
+.code usesimplestringer/main.go
+
+- add `go:generate` directive
+
+: Simply add the go:generate directive...
+
+* simplestringer: workflow
+
+    $ go generate .
+
+- run go generate
+
+: Run go generate...
+
+* simplestringer: output
+
+.code usesimplestringer/gen_Pill_simplestringer.go
+
+: Quickly scan the output
+
+* simplestringer: results
+
+<!-- __TEMPLATE: bash -c "cd usesimplestringer; echo '$ go run .'; go run ."
+{{indent .Out -}}
+-->
+<!-- END -->
+
+: Check the end result is what we're after
+: Give ourselves a pat on the back!
+
+* simplestringer: recap
+
+- simple Go-based code generator that takes single argument
+- looks at types and syntax of input package
+- not robust in the presence of syntax/type errors
+- not well-tested
+- not performant
+- generated code not as useful as it could be (see real `stringer` output)
+- ... lots of scope for improvement.
+
+But it works!
+
+: So where could we go from here?
+: Lots of options to make our code generators as smart as we like
+: But let's look in more detail at the workflow
+
+* gogenerate: go generate with wings
+
+* Problems with go generate
+
+- no package dependency analysis; have to run things "in right order"
+- slow; always re-runs generators
+- hard to chain generators together, or have generators themselves use code generation
+
+: you don't have to do any of these things for go build/install
+
+* Introducing gogenerate
+
+  myitcv.io/cmd/gogenerate
+
+- artefact cache-based wrapper around `go`generate` directives
+- import dependency aware
+- generator dependency aware
+- only re-runs generators if inputs change
+- re-runs generators until a fixed point is reached
+- much more simple to add code generation to your workflow
+- see [[https://github.com/myitcv/x/blob/master/cmd/gogenerate/README.md][the README]] for more details
+
+* gogenerate: run from cold
+
+  # first round (4.133s)
+  > gogenerate -trace -p 1 ./...
+  [stderr]
+  go list -deps -test -json ./...
+  hash commandDep commandDep: copy1
+  generate {Pkg: mod [G]}
+  ran generator: copy1 input1 2.00
+  generate {Pkg: mod [G]}
+  ran generator: copy1 input1 2.00
+  hash {Pkg: mod [G]}
+
+- copy1 takes an input file and copies it to create a generated output file
+- copy1 also has a 2s sleep to simulate a long-running generator
+
+* gogenerate: cache hit
+
+  # second round (0.126s)
+  > gogenerate -trace -p 1 ./...
+  [stderr]
+  go list -deps -test -json ./...
+  hash commandDep commandDep: copy1
+  hash {Pkg: mod [G]}
+
+Please experiment with gogenerate and report bugs!
+
+*Bonus:* report bugs using a [[https://godoc.org/github.com/rogpeppe/go-internal/testscript][testscript]] test case!
+
+* gogenerate: where next?
+
+- compile all code generators into a single binary
+- re-generate package AST and type information at most once per package per generator run
+- _significant_ performance gain
+- integrate into `gopls`
+
+* golang-tools
+
+* golang-tools: what is it?
+
+- golang-tools is a development list for Go Programming Language
+- for discussion of the development of tools that analyze and manipulate Go source code
+- including editor/IDE plugins, `gopls` (language server) etc
+- also the #tools channel on Gophers Slack
+
+See [[https://github.com/golang/go/wiki/golang-tools][the golang-tools wiki]] for more details.
+
+* Today we have
+
+- examined the principles of code generation
+- discovered the main parts of a code generator
+- looked at some popular code generators
+- written a simple code generator
+- seen how code generation fits into developer workflow, introduced `gogenerate`
+- inspired everyone to join the golang-tools community of tool builders!
+
+.image images/tool_gopher.png 200 _
+.caption Gopherize.me artwork courtesy of Ashley McNamara
+
+* Links
+
+- [[https://github.com/myitcv/talks/tree/master/2019-08-23-gophercon-uk-code-generation/simplestringer][code for simplestringer]]
+- [[https://github.com/myitcv/talks/tree/master/2019-08-23-gophercon-uk-code-generation][all the source for these slides]]
+- [[https://github.com/myitcv/x/blob/master/cmd/gogenerate/README.md][gogenerate README]]
+- [[https://github.com/golang/go/wiki/golang-tools][golang-tools wiki]]
+- [[https://blog.golang.org/generate][Rob Pike's original go generate blog post]]
+- [[https://godoc.org/golang.org/x/tools/cmd/stringer][stringer documentation]]
+- [[https://godoc.org/go][go/*: standard library packages for handling Go code (parsing, type analysis etc)]]
+- [[https://godoc.org/golang.org/x/tools/go/packages][go/packages: convenience, modules-aware syntax and type loading]]
+
+
