@@ -1,0 +1,4 @@
+# Verify that example works with no flags
+example
+stdout 'Hello, World!'
+! stderr .+

@@ -1,0 +1,6 @@
+# Verify that example works with custom greeting
+example -greeting Hi
+cmp stdout hi.txt
+
+-- hi.txt --
+Hi, World!

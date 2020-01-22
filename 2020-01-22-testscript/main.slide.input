@@ -1,0 +1,89 @@
+testscript
+Putting the "fun" back in testing
+22 Jan 2020
+
+Paul Jolly
+myitcv.io
+paul@myitcv.io
+https://myitcv.io
+@_myitcv
+
+* Today we will
+
+- look at what testscript is
+- live-code a simple program that uses testscript tests
+
+.image images/tool_gopher.png 200 _
+.caption Gopherize.me artwork courtesy of Ashley McNamara
+
+* What is testscript?
+
+    github.com/rogpeppe/go-internal/testscript
+
+    Package testscript provides support for defining filesystem-based tests
+    by creating scripts in a directory.
+
+[[https://pkg.go.dev/github.com/rogpeppe/go-internal/testscript][Full docs]]
+
+- Originally written by [[https://swtch.com/~rsc/][Russ Cox]]
+- Used extensively as part of `cmd/go` tests
+- Extracted into a library by [[https://twitter.com/rogpeppe][Roger Peppe]]
+
+* What is testscript (continued)?
+
+- You pass `testscript` a directory that contains scripts (`.txt` files)
+- Each script is a [[github.com/rogpeppe/go-internal/txtar][`txtar` text archive]]
+- Scripts start with a shell-esque command script
+- Followed by zero or more supporting files
+
+    # hello world
+    exec cat hello.text
+    stdout 'hello world\n'
+    ! stderr .
+
+    -- hello.text --
+    hello world
+
+* What is testscript (continued)?
+
+- Each script runs in a fresh temporary work directory tree, available as `$WORK`
+- Pseudo-isolation via "clean" environment:
+
+    HOME=/no-home
+    PATH=<actual PATH>
+    TMPDIR=$WORK/tmp
+
+- Supporting files are unpacked relative to `$WORK`
+- Then the script begins execution in `$WORK`
+
+* The command script looks like shell: is it?
+
+No
+
+- Very simple scripting language defined as part of testscript package
+- Script stops and the overall test fails if any particular command fails
+- Supports negation, environment variables, end-of-line comments, quoting command words, basic conditions
+
+* Are there any pre-defined commands?
+
+Yes.
+
+    cd dir
+    chmod mode file
+    cmp file1 file2
+    cp src... dst
+    ...
+
+See the [[https://pkg.go.dev/github.com/rogpeppe/go-internal/testscript][full docs]] for the full list.
+
+* Enough talk: let's see this in action
+
+* Where can I find out more?
+
+Did I mention the [[https://pkg.go.dev/github.com/rogpeppe/go-internal/testscript][full docs]] already?
+
+- Custom commands
+- Custom conditions
+- Custom `Setup` and `Defer`
+- ...
+
