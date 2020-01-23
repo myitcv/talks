@@ -87,3 +87,5 @@ Did I mention the [[https://pkg.go.dev/github.com/rogpeppe/go-internal/testscrip
 - Custom `Setup` and `Defer`
 - ...
 
+[[https://github.com/myitcv/talks/tree/master/2020-01-22-testscript/example][Code from the live-coded example]]
+
